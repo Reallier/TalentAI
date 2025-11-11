@@ -1,7 +1,6 @@
-import openai
+import dashscope
 from typing import List, Dict, Any, Optional
 from config import settings
-import tiktoken
 import json
 
 
@@ -9,10 +8,9 @@ class LLMService:
     """LLM 服务：用于 JD 解析、生成 embeddings 等"""
     
     def __init__(self):
-        openai.api_key = settings.openai_api_key
-        self.model = settings.openai_model
-        self.embedding_model = settings.openai_embedding_model
-        self.encoding = tiktoken.encoding_for_model("gpt-4")
+        dashscope.api_key = settings.dashscope_api_key
+        self.model = settings.llm_model
+        self.embedding_model = settings.embedding_model
     
     def parse_jd(self, jd_text: str) -> Dict[str, Any]:
         """
@@ -44,17 +42,16 @@ class LLMService:
 请确保返回有效的 JSON 格式。"""
 
         try:
-            response = openai.chat.completions.create(
+            response = dashscope.Generation.call(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "你是一个专业的招聘分析助手，擅长从职位描述中提取结构化信息。"},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
-                response_format={"type": "json_object"}
+                result_format='message'
             )
-            
-            result = json.loads(response.choices[0].message.content)
+
+            result = json.loads(response.output.choices[0].message.content)
             
             # 确保返回格式正确
             return {
@@ -85,15 +82,15 @@ class LLMService:
             embedding 向量（1536 维）
         """
         try:
-            # 截断过长的文本（OpenAI 有 token 限制）
+            # 截断过长的文本
             text = self._truncate_text(text, max_tokens=8000)
-            
-            response = openai.embeddings.create(
+
+            response = dashscope.TextEmbedding.call(
                 model=self.embedding_model,
                 input=text
             )
-            
-            return response.data[0].embedding
+
+            return response.output.embeddings[0].embedding
         
         except Exception as e:
             print(f"生成 embedding 失败: {str(e)}")
@@ -114,23 +111,23 @@ class LLMService:
         """
         embeddings = []
         
-        # 批量处理（OpenAI API 支持批量）
+        # 批量处理
         try:
             # 截断所有文本
             truncated_texts = [
-                self._truncate_text(text, max_tokens=8000) 
+                self._truncate_text(text, max_tokens=8000)
                 for text in texts
             ]
-            
-            response = openai.embeddings.create(
+
+            response = dashscope.TextEmbedding.call(
                 model=self.embedding_model,
                 input=truncated_texts
             )
-            
+
             # 按顺序提取 embeddings
-            for item in response.data:
+            for item in response.output.embeddings:
                 embeddings.append(item.embedding)
-            
+
             return embeddings
         
         except Exception as e:
@@ -186,17 +183,16 @@ class LLMService:
 最多返回 {max_evidences} 条证据。"""
 
         try:
-            response = openai.chat.completions.create(
+            response = dashscope.Generation.call(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "你是一个专业的简历分析助手。"},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
-                response_format={"type": "json_object"}
+                result_format='message'
             )
-            
-            result = json.loads(response.choices[0].message.content)
+
+            result = json.loads(response.output.choices[0].message.content)
             return result.get('evidences', [])
         
         except Exception as e:
@@ -265,13 +261,14 @@ class LLMService:
         return "\n".join(parts)
     
     def _truncate_text(self, text: str, max_tokens: int = 8000) -> str:
-        """截断文本以符合 token 限制"""
-        tokens = self.encoding.encode(text)
-        if len(tokens) > max_tokens:
-            tokens = tokens[:max_tokens]
-            text = self.encoding.decode(tokens)
+        """截断文本以符合 token 限制（近似）"""
+        # 简单近似：1 token ≈ 4 字符
+        max_chars = max_tokens * 4
+        if len(text) > max_chars:
+            text = text[:max_chars]
         return text
-    
+
     def count_tokens(self, text: str) -> int:
-        """计算文本的 token 数量"""
-        return len(self.encoding.encode(text))
+        """计算文本的 token 数量（近似）"""
+        # 简单近似：1 token ≈ 4 字符
+        return len(text) // 4

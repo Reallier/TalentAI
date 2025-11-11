@@ -13,10 +13,10 @@ class Settings(BaseSettings):
     database_user: str = "talentai"
     database_password: str = "talentai123"
     
-    # OpenAI
-    openai_api_key: str
-    openai_model: str = "gpt-4-turbo-preview"
-    openai_embedding_model: str = "text-embedding-3-small"
+    # DashScope/Qwen
+    dashscope_api_key: str
+    llm_model: str = "qwen-turbo"
+    embedding_model: str = "text-embedding-v1"
     
     # Application
     api_host: str = "0.0.0.0"
