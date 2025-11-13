@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  talentai-frontend:
+    image: ccr.ccs.tencentyun.com/reallier/talentai-frontend:latest
+    container_name: talentai_frontend
+    environment:
+      - NODE_ENV=production
+    restart: always
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.talentai-frontend.rule=Host(`talentai.reallier.top`)"
+      - "traefik.http.routers.talentai-frontend.entrypoints=websecure"
+      - "traefik.http.routers.talentai-frontend.tls=true"
+      - "traefik.http.routers.talentai-frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.talentai-frontend.loadbalancer.server.port=80"
+    depends_on:
+      - talentai-backend
+
+  talentai-backend:
+    image: ccr.ccs.tencentyun.com/reallier/talentai-backend:latest
+    container_name: talentai_backend
+    environment:
+      - DATABASE_URL=postgresql://talentai:talentai123@talentai-db:5432/talentai
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - ENVIRONMENT=production
+    restart: always
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.talentai-backend.rule=Host(`api.talentai.reallier.top`)"
+      - "traefik.http.routers.talentai-backend.entrypoints=websecure"
+      - "traefik.http.routers.talentai-backend.tls=true"
+      - "traefik.http.routers.talentai-backend.tls.certresolver=myresolver"
+      - "traefik.http.services.talentai-backend.loadbalancer.server.port=8000"
+    depends_on:
+      talentai-db:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+
+  talentai-db:
+    image: pgvector/pgvector:pg15
+    container_name: talentai_db
+    environment:
+      POSTGRES_USER: talentai
+      POSTGRES_PASSWORD: talentai123
+      POSTGRES_DB: talentai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - traefik
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talentai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+volumes:
+  postgres_data:
+  uploads:
+
+networks:
+  traefik:
+    external: true

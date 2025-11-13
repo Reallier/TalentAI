@@ -2,6 +2,13 @@
 
 基于 RAG 的智能人才匹配与简历管理系统
 
+## 🚀 生产环境状态
+
+- **✅ 部署状态**: 已上线运行
+- **🌐 前端访问**: https://talentai.reallier.top:5443
+- **🔗 API 访问**: https://api.talentai.reallier.top:5443
+- **📊 系统状态**: 正常运行中
+
 ## 核心功能
 
 ### 1. JD→匹配
@@ -18,13 +25,17 @@
 
 ## 技术栈
 
+- **前端**: 纯静态 HTML/CSS/JS + Nginx
 - **后端**: Python 3.11+ / FastAPI
 - **数据库**: PostgreSQL 15+ (结构化 + FTS + pgvector)
-- **LLM**: OpenAI API (可替换)
-- **部署**: Docker Compose
+- **LLM**: DashScope API (通义千问)
+- **反向代理**: Traefik (自动SSL证书)
+- **容器化**: Docker + Docker Compose
+- **镜像仓库**: 腾讯云容器镜像服务
 
 ## 系统架构
 
+### 开发环境
 ```
 ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
 │   前端界面   │ ───> │   FastAPI    │ ───> │ PostgreSQL  │
@@ -33,27 +44,48 @@
                             │
                             v
                      ┌──────────────┐
-                     │  OpenAI API  │
-                     │ (LLM + Embed)│
+                     │ DashScope API│
+                     │ (通义千问)   │
                      └──────────────┘
+```
+
+### 生产环境
+```
+[用户浏览器] → HTTPS
+    ↓
+[Traefik Reverse Proxy] (端口:5443)
+├── talentai.reallier.top → Frontend Container (nginx:80)
+└── api.talentai.reallier.top → Backend Container (FastAPI:8000)
+                                     ↓
+                               Database Container (PostgreSQL:5432)
 ```
 
 ## 快速开始
 
-### 前置要求
+### 🏭 生产环境 (推荐)
+
+系统已部署在生产环境，可直接访问：
+
+- **前端界面**: https://talentai.reallier.top:5443
+- **API 文档**: https://api.talentai.reallier.top:5443/docs
+- **系统状态**: https://api.talentai.reallier.top:5443/api/stats
+
+### 🏠 本地开发环境
+
+#### 前置要求
 
 - Docker 20.10+
 - Docker Compose 2.0+
-- OpenAI API Key
+- DashScope API Key (通义千问)
 
-### 一键启动
+#### 一键启动
 
 ```bash
 # 1. 复制环境变量模板
 cp backend/.env.example backend/.env
 
-# 2. 编辑 backend/.env，填入你的 OpenAI API Key
-# OPENAI_API_KEY=sk-your-actual-key-here
+# 2. 编辑 backend/.env，填入你的 DashScope API Key
+# DASHSCOPE_API_KEY=sk-your-actual-key-here
 
 # 3. 给启动脚本添加执行权限
 chmod +x start.sh
